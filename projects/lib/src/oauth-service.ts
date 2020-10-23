@@ -499,6 +499,21 @@ export class OAuthService extends AuthConfig implements OnDestroy {
     fullUrl: string = null
   ): Promise<OAuthSuccessEvent> {
     return new Promise((resolve, reject) => {
+      // This is a hack for ForgeRock Access Manager that does not publish revocation_endpoint
+      if (!fullUrl && this.revocationEndpoint) {
+        // We have not been given a fullUrl, therefore it is okay to massage the revocationEndpoint if set
+        // We should check that the issuer defined in the AT matches the issuer value on revocation, but this will
+        // delay a potential attacker by setting it to a URL that is non compliant
+        let tokenRevocationURL = this.issuer || '!';
+        if (!tokenRevocationURL.endsWith('/')) {
+          tokenRevocationURL += '/';
+        }
+        this.revocationEndpoint = tokenRevocationURL + this.revocationEndpoint;
+      } else {
+        // if we have a fullURL and no revocationEndpoint no harm in setting to empty
+        this.revocationEndpoint = '';
+      }
+
       if (!fullUrl) {
         fullUrl = this.issuer || '';
         if (!fullUrl.endsWith('/')) {
@@ -537,7 +552,7 @@ export class OAuthService extends AuthConfig implements OnDestroy {
 
           this.discoveryDocumentLoaded = true;
           this.discoveryDocumentLoadedSubject.next(doc);
-          this.revocationEndpoint = doc.revocation_endpoint;
+          this.revocationEndpoint = doc.revocation_endpoint || this.revocationEndpoint;
 
           if (this.sessionChecksEnabled) {
             this.restartSessionChecksIfStillLoggedIn();
